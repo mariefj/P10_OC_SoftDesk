@@ -22,12 +22,13 @@ from tracking.views import ProjectViewset
  
 router = routers.SimpleRouter()
 
-router.register('projects', ProjectViewset, basename='projects')
+router.register(r'projects', ProjectViewset, basename='projects')
  
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api-auth/', include('rest_framework.urls')),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('api/', include(router.urls))
+    path('', include(router.urls))
 ]
+
