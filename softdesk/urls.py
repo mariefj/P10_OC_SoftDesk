@@ -13,22 +13,32 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from cgitb import lookup
 from django.contrib import admin
 from django.urls import path, include
-from rest_framework import routers
+from rest_framework.routers import DefaultRouter
+from rest_framework_nested import routers
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
  
-from tracking.views import ProjectViewset
+from tracking.views import ProjectViewset, SignUpViewset, IssueViewset, ContributorViewset, CommentViewset
  
-router = routers.SimpleRouter()
+router = DefaultRouter()
 
 router.register(r'projects', ProjectViewset, basename='projects')
+
+project_router = routers.NestedSimpleRouter(router, r'projects', lookup='project')
+project_router.register(r'issues', IssueViewset, basename='issues')
+project_router.register(r'users', ContributorViewset, basename='users')
  
+issue_router = routers.NestedSimpleRouter(project_router, r'issues', lookup='issue')
+issue_router.register(r'comments', CommentViewset, basename='comments')
+
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('api-auth/', include('rest_framework.urls')),
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('', include(router.urls))
+    path('login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('login/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('signup/', SignUpViewset.as_view(), name='signup'),
+    path('', include(router.urls)),
+    path('', include(project_router.urls)),
+    path('', include(issue_router.urls)),
 ]
 

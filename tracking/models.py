@@ -58,8 +58,8 @@ class Issue(models.Model):
     status = models.CharField(max_length=8, choices=STATUS, default=TO_DO)
     created_time = models.DateTimeField(auto_now_add=True)
     project = models.ForeignKey('tracking.Project', on_delete=models.CASCADE, related_name='issues')
-    author_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="issues")
-    assignee_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="issues", default=author_user)
+    author_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="author_issues")
+    assignee_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="assigned_issues", default=author_user)
 
     def __str__(self):
         return self.title
@@ -76,15 +76,6 @@ class Comment(models.Model):
 
 class Contributor(models.Model):
 
-    IS_ADMIN = 'admin'
-    IS_AUTHOR = 'auteur'
-    IS_CONTRIBUTOR = 'collaborateur'
-    PERMISSION = [
-        (IS_ADMIN, ('admin')),
-        (IS_AUTHOR, ('auteur')),
-        (IS_CONTRIBUTOR, ('collaborateur')),
-    ]
-
     AUTHOR = 'auteur'
     CONTRIBUTOR = 'collaborateur'
     ROLE = [
@@ -92,10 +83,9 @@ class Contributor(models.Model):
         (CONTRIBUTOR, ('collaborateur')),
     ]
 
-    permission = models.CharField(max_length=255, choices=PERMISSION)
     role = models.CharField(max_length=255, choices=ROLE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="user_contributor")
-    project = models.ForeignKey('tracking.Issue', on_delete=models.CASCADE, related_name="project_contributor")
+    project = models.ForeignKey('tracking.Project', on_delete=models.CASCADE, related_name="contributors")
 
     def __str__(self):
         return self.user.first_name

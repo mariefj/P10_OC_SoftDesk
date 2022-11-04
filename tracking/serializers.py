@@ -1,7 +1,19 @@
 from rest_framework.serializers import ModelSerializer, SerializerMethodField, ValidationError
- 
+
+from authentication.models import User 
 from tracking.models import Project, Issue, Comment, Contributor
 
+class UserSerializer(ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            'username',
+            'email',
+            'password',
+        ]
+
+    def create(self, data):
+        return super(UserSerializer, self).create(data)
 
 class ProjectListSerializer(ModelSerializer):
     class Meta:
@@ -102,6 +114,5 @@ class ContributorSerializer(ModelSerializer):
             'id',
             'user',
             'project',
-            'permission',
             'role',
         ]
