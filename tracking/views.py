@@ -1,4 +1,6 @@
-from rest_framework.viewsets import ReadOnlyModelViewSet, ModelViewSet
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -40,8 +42,14 @@ class ProjectViewset(MultipleSerializerMixin, ModelViewSet):
         data = request.data.copy()
         data['author_user'] = user
         serializer = ProjectListSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+        if serializer.is_valid(raise_exception=True):
+            project = serializer.save()
+            contributor = Contributor(
+                user=request.user,
+                project=project,
+                role='auteur'
+            )
+            contributor.save()
         return Response(data=serializer.data)
 
     def get_queryset(self):
@@ -59,7 +67,7 @@ class IssueViewset(MultipleSerializerMixin, ModelViewSet):
 class CommentViewset(MultipleSerializerMixin, ModelViewSet):
     serializer_class = CommentSerializer
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAuthor]
 
     def get_queryset(self):
         return Comment.objects.all()
@@ -67,7 +75,20 @@ class CommentViewset(MultipleSerializerMixin, ModelViewSet):
 class ContributorViewset(MultipleSerializerMixin, ModelViewSet):
     serializer_class = ContributorSerializer
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAuthor]
+
+    def create(self, request, *args, **kwargs):
+        project=get_object_or_404(Project, pk=kwargs['project_pk'])
+        self.check_object_permissions(request, project)
+        data = request.data.copy()
+        data['project'] = kwargs['project_pk']
+        serializer = ContributorSerializer(data=data)
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
+        return Response(data=serializer.data)
 
     def get_queryset(self):
-        return Contributor.objects.filter(project=self.kwargs['project_pk'])
+        get_object_or_404(Project, pk=self.kwargs['project_pk'])
+        if Contributor.objects.filter(user=self.request.user, project=self.kwargs['project_pk']).exists():
+            return Contributor.objects.filter(project=self.kwargs['project_pk'])
+        raise PermissionDenied(detail='You must be contributor on this project to do this action')
