@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.hashers import make_password
 
+from tracking.permissions import IsAuthor
 from authentication.models import User
 from tracking.models import Project, Issue, Comment, Contributor
 from tracking.serializers import (ProjectListSerializer, ProjectDetailSerializer, IssueListSerializer,
@@ -20,7 +21,7 @@ class MultipleSerializerMixin:
 
 class SignUpViewset(APIView):
     def post(self, request, format=None):
-        name = request.data['name']
+        name = request.data['username']
         email = request.data['email']
         password = make_password(request.data['password'])
         user = User.objects.create(username=name, email=email, password=password)
@@ -32,10 +33,19 @@ class ProjectViewset(MultipleSerializerMixin, ModelViewSet):
     serializer_class = ProjectListSerializer
     detail_serializer_class = ProjectDetailSerializer
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAuthor]
+
+    def create(self, request, *args, **kargs):
+        user = request.user.id
+        data = request.data.copy()
+        data['author_user'] = user
+        serializer = ProjectListSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(data=serializer.data)
 
     def get_queryset(self):
-        return Project.objects.all()
+        return (Project.objects.filter(author_user=self.request.user) | Project.objects.filter(contributors__user=self.request.user)).distinct()
 
 class IssueViewset(MultipleSerializerMixin, ModelViewSet):
     serializer_class = IssueListSerializer
@@ -60,4 +70,4 @@ class ContributorViewset(MultipleSerializerMixin, ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Contributor.objects.all()
+        return Contributor.objects.filter(project=self.kwargs['project_pk'])
