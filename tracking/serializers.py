@@ -73,6 +73,21 @@ class IssueListSerializer(ModelSerializer):
             'created_time',
         ]
 
+    def validate_tag(self, value):
+        if value not in ['BUG', 'AMELIORATION', 'TACHE']:
+            raise ValidationError('Invalid tag')
+        return value
+
+    def validate_priority(self, value):
+        if value not in ['FAIBLE', 'MOYENNE', 'ELEVEE']:
+            raise ValidationError('Invalid priority')
+        return value
+
+    def validate_status(self, value):
+        if value not in ['A faire', 'En cours', 'Terminé']:
+            raise ValidationError('Invalid status')
+        return value
+
 class IssueDetailSerializer(ModelSerializer):
 
     def get_comments(self, instance):
@@ -116,3 +131,8 @@ class ContributorSerializer(ModelSerializer):
             'project',
             'role',
         ]
+
+    def validate_role(self, value):
+        if value not in ['auteur', 'collaborateur']:
+            raise ValidationError('Invalid role')
+        return value

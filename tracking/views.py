@@ -1,3 +1,4 @@
+from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.generics import get_object_or_404
@@ -50,7 +51,7 @@ class ProjectViewset(MultipleSerializerMixin, ModelViewSet):
                 role='auteur'
             )
             contributor.save()
-        return Response(data=serializer.data)
+            return Response(data=serializer.data)
 
     def get_queryset(self):
         return (Project.objects.filter(author_user=self.request.user) | Project.objects.filter(contributors__user=self.request.user)).distinct()
@@ -59,7 +60,27 @@ class IssueViewset(MultipleSerializerMixin, ModelViewSet):
     serializer_class = IssueListSerializer
     detail_serializer_class = IssueDetailSerializer
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAuthor]
+
+    def create(self, request, *args, **kwargs):
+        user = request.user.id
+        get_object_or_404(Project, pk=kwargs['project_pk'])
+        if Contributor.objects.filter(user=self.request.user, project=self.kwargs['project_pk']).exists():
+            data = request.data.copy()
+            data['project'] = kwargs['project_pk']
+            data['author_user'] = user
+            if request.data.assignee_user:
+                assignee_user = User.objects.get(user_id=request.data.assignee_user)
+                if not Contributor.objects.filter(user=assignee_user, project=self.kwargs['project_pk']).exists():
+                    return Response(assignee_user, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    data['assignee_user'] = request.data.assignee_user
+            else:
+                data['assignee_user'] = user
+            serializer = IssueListSerializer(data=data)
+            if serializer.is_valid(raise_exception=True):
+                serializer.save()
+        return Response(data=serializer.data)
 
     def get_queryset(self):
         return Issue.objects.all()
