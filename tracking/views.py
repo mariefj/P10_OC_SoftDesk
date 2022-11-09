@@ -64,18 +64,17 @@ class IssueViewset(MultipleSerializerMixin, ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         user = request.user.id
-        get_object_or_404(Project, pk=kwargs['project_pk'])
+        project = get_object_or_404(Project, pk=kwargs['project_pk'])
         if Contributor.objects.filter(user=self.request.user, project=self.kwargs['project_pk']).exists():
             data = request.data.copy()
             data['project'] = kwargs['project_pk']
             data['author_user'] = user
-            if request.data.assignee_user:
-                assignee_user = User.objects.get(user_id=request.data.assignee_user)
-                if not Contributor.objects.filter(user=assignee_user, project=self.kwargs['project_pk']).exists():
-                    return Response(assignee_user, status=status.HTTP_400_BAD_REQUEST)
-                else:
-                    data['assignee_user'] = request.data.assignee_user
-            else:
+            try:
+                if request.data['assignee_user']:
+                    assignee_user = User.objects.get(id=request.data['assignee_user'])
+                    get_object_or_404(Contributor, user=assignee_user, project=project)
+                    data['assignee_user'] = request.data['assignee_user']
+            except KeyError:
                 data['assignee_user'] = user
             serializer = IssueListSerializer(data=data)
             if serializer.is_valid(raise_exception=True):
@@ -90,6 +89,19 @@ class CommentViewset(MultipleSerializerMixin, ModelViewSet):
 
     permission_classes = [IsAuthenticated, IsAuthor]
 
+    def create(self, request, *args, **kwargs):
+        user = request.user.id
+        get_object_or_404(Project, pk=kwargs['project_pk'])
+        get_object_or_404(Issue, pk=kwargs['issue_pk'])
+        if Contributor.objects.filter(user=self.request.user, project=self.kwargs['project_pk']).exists():
+            data = request.data.copy()
+            data['issue'] = kwargs['issue_pk']
+            data['author_user'] = user
+            serializer = CommentSerializer(data=data)
+            if serializer.is_valid(raise_exception=True):
+                serializer.save()
+        return Response(data=serializer.data)
+
     def get_queryset(self):
         return Comment.objects.all()
 
@@ -99,7 +111,7 @@ class ContributorViewset(MultipleSerializerMixin, ModelViewSet):
     permission_classes = [IsAuthenticated, IsAuthor]
 
     def create(self, request, *args, **kwargs):
-        project=get_object_or_404(Project, pk=kwargs['project_pk'])
+        project = get_object_or_404(Project, pk=kwargs['project_pk'])
         self.check_object_permissions(request, project)
         data = request.data.copy()
         data['project'] = kwargs['project_pk']
@@ -107,6 +119,9 @@ class ContributorViewset(MultipleSerializerMixin, ModelViewSet):
         if serializer.is_valid(raise_exception=True):
             serializer.save()
         return Response(data=serializer.data)
+
+    def get_project(self):
+        return get_object_or_404(Project, pk=self.kwargs['project_pk'])
 
     def get_queryset(self):
         get_object_or_404(Project, pk=self.kwargs['project_pk'])
