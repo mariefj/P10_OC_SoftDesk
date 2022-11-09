@@ -24,10 +24,12 @@ class MultipleSerializerMixin:
 
 class SignUpViewset(APIView):
     def post(self, request, format=None):
-        name = request.data['username']
+        username = request.data['username']
+        first_name = request.data['first_name']
+        last_name = request.data['last_name']
         email = request.data['email']
         password = make_password(request.data['password'])
-        user = User.objects.create(username=name, email=email, password=password)
+        user = User.objects.create(username=username, first_name=first_name, last_name=last_name, email=email, password=password)
         serializer = UserSerializer(user)
         return Response(data=serializer.data)
 
@@ -82,7 +84,10 @@ class IssueViewset(MultipleSerializerMixin, ModelViewSet):
         return Response(data=serializer.data)
 
     def get_queryset(self):
-        return Issue.objects.all()
+        get_object_or_404(Project, pk=self.kwargs['project_pk'])
+        if Contributor.objects.filter(user=self.request.user, project=self.kwargs['project_pk']).exists():
+            return Issue.objects.filter(project=self.kwargs['project_pk'])
+        raise PermissionDenied(detail='You must be contributor on this project to do this action')
 
 class CommentViewset(MultipleSerializerMixin, ModelViewSet):
     serializer_class = CommentSerializer
@@ -92,7 +97,8 @@ class CommentViewset(MultipleSerializerMixin, ModelViewSet):
     def create(self, request, *args, **kwargs):
         user = request.user.id
         get_object_or_404(Project, pk=kwargs['project_pk'])
-        get_object_or_404(Issue, pk=kwargs['issue_pk'])
+        issues = Issue.objects.filter(project=self.kwargs['project_pk'])
+        get_object_or_404(issues, pk=kwargs['issue_pk'])
         if Contributor.objects.filter(user=self.request.user, project=self.kwargs['project_pk']).exists():
             data = request.data.copy()
             data['issue'] = kwargs['issue_pk']
@@ -103,7 +109,12 @@ class CommentViewset(MultipleSerializerMixin, ModelViewSet):
         return Response(data=serializer.data)
 
     def get_queryset(self):
-        return Comment.objects.all()
+        get_object_or_404(Project, pk=self.kwargs['project_pk'])
+        issues = Issue.objects.filter(project=self.kwargs['project_pk'])
+        get_object_or_404(issues, pk=self.kwargs['issue_pk'])
+        if Contributor.objects.filter(user=self.request.user, project=self.kwargs['project_pk']).exists():
+            return Comment.objects.filter(issue=self.kwargs['issue_pk'])
+        raise PermissionDenied(detail='You must be contributor on this project to do this action')
 
 class ContributorViewset(MultipleSerializerMixin, ModelViewSet):
     serializer_class = ContributorSerializer
