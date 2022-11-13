@@ -10,30 +10,59 @@ from django.contrib.auth.hashers import make_password
 from tracking.permissions import IsAuthor
 from authentication.models import User
 from tracking.models import Project, Issue, Comment, Contributor
-from tracking.serializers import (ProjectListSerializer, ProjectDetailSerializer, IssueListSerializer,
-IssueDetailSerializer, CommentSerializer, ContributorSerializer, UserSerializer)
+from tracking.serializers import (
+    ProjectListSerializer,
+    ProjectDetailSerializer,
+    IssueListSerializer,
+    IssueDetailSerializer,
+    CommentSerializer,
+    ContributorSerializer,
+    UserSerializer,
+)
+
 
 class MultipleSerializerMixin:
 
     detail_serializer_class = None
 
     def get_serializer_class(self):
-        if self.action == 'retrieve' and self.detail_serializer_class is not None:
+        if self.action == "retrieve" and self.detail_serializer_class is not None:
             return self.detail_serializer_class
         return super().get_serializer_class()
 
+
+class GetProjectMixin:
+    def get_project(self):
+        return get_object_or_404(Project, pk=self.kwargs["project_pk"])
+
+
+class CheckContributorMixin:
+    def check_contributor(self):
+        return Contributor.objects.filter(
+            user=self.request.user, project=self.kwargs["project_pk"]
+        ).exists()
+
+
 class SignUpViewset(APIView):
     def post(self, request, format=None):
-        username = request.data['username']
-        first_name = request.data['first_name']
-        last_name = request.data['last_name']
-        email = request.data['email']
-        password = make_password(request.data['password'])
-        user = User.objects.create(username=username, first_name=first_name, last_name=last_name, email=email, password=password)
+        username = request.data["username"]
+        first_name = request.data["first_name"]
+        last_name = request.data["last_name"]
+        email = request.data["email"]
+        password = make_password(request.data["password"])
+        user = User.objects.create(
+            username=username,
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            password=password,
+        )
         serializer = UserSerializer(user)
+
         return Response(data=serializer.data)
 
-class ProjectViewset(MultipleSerializerMixin, ModelViewSet):
+
+class ProjectViewset(CheckContributorMixin, MultipleSerializerMixin, ModelViewSet):
 
     serializer_class = ProjectListSerializer
     detail_serializer_class = ProjectDetailSerializer
@@ -43,22 +72,26 @@ class ProjectViewset(MultipleSerializerMixin, ModelViewSet):
     def create(self, request, *args, **kargs):
         user = request.user.id
         data = request.data.copy()
-        data['author_user'] = user
+        data["author_user"] = user
         serializer = ProjectListSerializer(data=data)
+
         if serializer.is_valid(raise_exception=True):
             project = serializer.save()
-            contributor = Contributor(
-                user=request.user,
-                project=project,
-                role='auteur'
-            )
+            contributor = Contributor(user=request.user, project=project, role="auteur")
             contributor.save()
-            return Response(data=serializer.data)
+
+        return Response(data=serializer.data)
 
     def get_queryset(self):
-        return (Project.objects.filter(author_user=self.request.user) | Project.objects.filter(contributors__user=self.request.user)).distinct()
+        return (
+            Project.objects.filter(author_user=self.request.user)
+            | Project.objects.filter(contributors__user=self.request.user)
+        ).distinct()
 
-class IssueViewset(MultipleSerializerMixin, ModelViewSet):
+
+class IssueViewset(
+    CheckContributorMixin, GetProjectMixin, MultipleSerializerMixin, ModelViewSet
+):
     serializer_class = IssueListSerializer
     detail_serializer_class = IssueDetailSerializer
 
@@ -66,76 +99,89 @@ class IssueViewset(MultipleSerializerMixin, ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         user = request.user.id
-        project = get_object_or_404(Project, pk=kwargs['project_pk'])
-        if Contributor.objects.filter(user=self.request.user, project=self.kwargs['project_pk']).exists():
+        project = self.get_project()
+
+        if self.check_contributor():
             data = request.data.copy()
-            data['project'] = kwargs['project_pk']
-            data['author_user'] = user
+            data["project"] = kwargs["project_pk"]
+            data["author_user"] = user
             try:
-                if request.data['assignee_user']:
-                    assignee_user = User.objects.get(id=request.data['assignee_user'])
+                if request.data["assignee_user"]:
+                    assignee_user = User.objects.get(id=request.data["assignee_user"])
                     get_object_or_404(Contributor, user=assignee_user, project=project)
-                    data['assignee_user'] = request.data['assignee_user']
+                    data["assignee_user"] = request.data["assignee_user"]
             except KeyError:
-                data['assignee_user'] = user
+                data["assignee_user"] = user
             serializer = IssueListSerializer(data=data)
+
             if serializer.is_valid(raise_exception=True):
                 serializer.save()
+
         return Response(data=serializer.data)
 
     def get_queryset(self):
-        get_object_or_404(Project, pk=self.kwargs['project_pk'])
-        if Contributor.objects.filter(user=self.request.user, project=self.kwargs['project_pk']).exists():
-            return Issue.objects.filter(project=self.kwargs['project_pk'])
-        raise PermissionDenied(detail='You must be contributor on this project to do this action')
+        self.get_project()
+        if self.check_contributor():
+            return Issue.objects.filter(project=self.kwargs["project_pk"])
+        raise PermissionDenied(
+            detail="You must be contributor on this project to do this action"
+        )
 
-class CommentViewset(MultipleSerializerMixin, ModelViewSet):
+
+class CommentViewset(
+    CheckContributorMixin, GetProjectMixin, MultipleSerializerMixin, ModelViewSet
+):
     serializer_class = CommentSerializer
 
     permission_classes = [IsAuthenticated, IsAuthor]
 
     def create(self, request, *args, **kwargs):
         user = request.user.id
-        get_object_or_404(Project, pk=kwargs['project_pk'])
-        issues = Issue.objects.filter(project=self.kwargs['project_pk'])
-        get_object_or_404(issues, pk=kwargs['issue_pk'])
-        if Contributor.objects.filter(user=self.request.user, project=self.kwargs['project_pk']).exists():
+        project = self.get_project()
+        get_object_or_404(Issue, pk=kwargs["issue_pk"], project=project)
+
+        if self.check_contributor():
             data = request.data.copy()
-            data['issue'] = kwargs['issue_pk']
-            data['author_user'] = user
+            data["issue"] = kwargs["issue_pk"]
+            data["author_user"] = user
             serializer = CommentSerializer(data=data)
             if serializer.is_valid(raise_exception=True):
                 serializer.save()
+
         return Response(data=serializer.data)
 
     def get_queryset(self):
-        get_object_or_404(Project, pk=self.kwargs['project_pk'])
-        issues = Issue.objects.filter(project=self.kwargs['project_pk'])
-        get_object_or_404(issues, pk=self.kwargs['issue_pk'])
-        if Contributor.objects.filter(user=self.request.user, project=self.kwargs['project_pk']).exists():
-            return Comment.objects.filter(issue=self.kwargs['issue_pk'])
-        raise PermissionDenied(detail='You must be contributor on this project to do this action')
+        project = self.get_project()
+        get_object_or_404(pk=self.kwargs["issue_pk"], project=project)
+        if self.check_contributor():
+            return Comment.objects.filter(issue=self.kwargs["issue_pk"])
+        raise PermissionDenied(
+            detail="You must be contributor on this project to do this action"
+        )
 
-class ContributorViewset(MultipleSerializerMixin, ModelViewSet):
+
+class ContributorViewset(
+    CheckContributorMixin, GetProjectMixin, MultipleSerializerMixin, ModelViewSet
+):
     serializer_class = ContributorSerializer
 
     permission_classes = [IsAuthenticated, IsAuthor]
 
     def create(self, request, *args, **kwargs):
-        project = get_object_or_404(Project, pk=kwargs['project_pk'])
+        project = self.get_project()
         self.check_object_permissions(request, project)
         data = request.data.copy()
-        data['project'] = kwargs['project_pk']
+        data["project"] = kwargs["project_pk"]
         serializer = ContributorSerializer(data=data)
         if serializer.is_valid(raise_exception=True):
             serializer.save()
+
         return Response(data=serializer.data)
 
-    def get_project(self):
-        return get_object_or_404(Project, pk=self.kwargs['project_pk'])
-
     def get_queryset(self):
-        get_object_or_404(Project, pk=self.kwargs['project_pk'])
-        if Contributor.objects.filter(user=self.request.user, project=self.kwargs['project_pk']).exists():
-            return Contributor.objects.filter(project=self.kwargs['project_pk'])
-        raise PermissionDenied(detail='You must be contributor on this project to do this action')
+        self.get_project()
+        if self.check_contributor():
+            return Contributor.objects.filter(project=self.kwargs["project_pk"])
+        raise PermissionDenied(
+            detail="You must be contributor on this project to do this action"
+        )
