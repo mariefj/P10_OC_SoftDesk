@@ -66,29 +66,29 @@ A complete documentation is available [here](https://documenter.getpostman.com/v
 
 HTTP Methods | Endpoints | Action
 
-POST | /signup/ | To sign up a new user account
-POST | /login/ | To login an existing user account
+POST | /signup/ | To sign up a new user account  
+POST | /login/ | To login an existing user account  
 
-GET | /projects/ | To retrieve all projects where the currently user is a contributor
-POST | /projects/ | To add a new project
-GET | /projects/{id}/ | To get an existing project
-PUT | /projects/{id}/ | To update an existing project
-DELETE | /projects/{id}/ | To delete an existing project and its issues and contributors
+GET | /projects/ | To retrieve all projects where the currently user is a contributor  
+POST | /projects/ | To add a new project  
+GET | /projects/{id}/ | To get an existing project  
+PUT | /projects/{id}/ | To update an existing project  
+DELETE | /projects/{id}/ | To delete an existing project and its issues and contributors  
 
-GET | /projects/{id}/users/ | To retrieve all contributors of a project
-POST | /projects/{id}/users/ | To add a new contributor to a project
-GET | /projects/{id}/users/{id}/ | To get a contributor
-PUT | /projects/{id}/users/{id}/ | To update a contributor
-DELETE | /projects/{id}/users/{id}/ | To delete an existing contributor
+GET | /projects/{id}/users/ | To retrieve all contributors of a project  
+POST | /projects/{id}/users/ | To add a new contributor to a project  
+GET | /projects/{id}/users/{id}/ | To get a contributor  
+PUT | /projects/{id}/users/{id}/ | To update a contributor  
+DELETE | /projects/{id}/users/{id}/ | To delete an existing contributor  
 
-GET | /projects/{id}/issues/ | To retrieve all issues from a project
-POST | /projects/{id}/issues/ | To add a new issue
-GET | /projects/{id}/issues/{id}/ | To get an existing issue
-PUT | /projects/{id}/issues/{id}/ | To update an existing issue
-DELETE | /projects/{id}/issues/{id}/ | To delete an existing issue and its comments
+GET | /projects/{id}/issues/ | To retrieve all issues from a project  
+POST | /projects/{id}/issues/ | To add a new issue  
+GET | /projects/{id}/issues/{id}/ | To get an existing issue  
+PUT | /projects/{id}/issues/{id}/ | To update an existing issue  
+DELETE | /projects/{id}/issues/{id}/ | To delete an existing issue and its comments  
 
-GET | /projects/{id}/issues/comments/ | To retrieve all comments from an issue
-POST | /projects/{id}/issues/comments/ | To add a new comment
-GET | /projects/{id}/issues/{id}comments/{id}/ | To get an existing comment
-PUT | /projects/{id}/issues/{id}comments/{id}/ | To update an existing comment
-DELETE | /projects/{id}/issues/{id}comments/{id}/ | To delete an existing comment
+GET | /projects/{id}/issues/comments/ | To retrieve all comments from an issue  
+POST | /projects/{id}/issues/comments/ | To add a new comment  
+GET | /projects/{id}/issues/{id}comments/{id}/ | To get an existing comment  
+PUT | /projects/{id}/issues/{id}comments/{id}/ | To update an existing comment  
+DELETE | /projects/{id}/issues/{id}comments/{id}/ | To delete an existing comment  
