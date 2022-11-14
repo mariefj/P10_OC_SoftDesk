@@ -45,19 +45,11 @@ class CheckContributorMixin:
 
 class SignUpViewset(APIView):
     def post(self, request, format=None):
-        username = request.data["username"]
-        first_name = request.data["first_name"]
-        last_name = request.data["last_name"]
-        email = request.data["email"]
-        password = make_password(request.data["password"])
-        user = User.objects.create(
-            username=username,
-            first_name=first_name,
-            last_name=last_name,
-            email=email,
-            password=password,
-        )
-        serializer = UserSerializer(user)
+        data = request.data.copy()
+        data['password'] = make_password(request.data["password"])
+        serializer = UserSerializer(data=data)
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
 
         return Response(data=serializer.data)
 
