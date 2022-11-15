@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.hashers import make_password
 
-from tracking.permissions import IsAuthor
+from tracking.permissions import IsAuthor, IsContributorAuthor
 from authentication.models import User
 from tracking.models import Project, Issue, Comment, Contributor
 from tracking.serializers import (
@@ -61,7 +61,7 @@ class ProjectViewset(CheckContributorMixin, MultipleSerializerMixin, ModelViewSe
 
     permission_classes = [IsAuthenticated, IsAuthor]
 
-    def create(self, request, *args, **kargs):
+    def create(self, request, *args, **kwargs):
         user = request.user.id
         data = request.data.copy()
         data["author_user"] = user
@@ -73,6 +73,12 @@ class ProjectViewset(CheckContributorMixin, MultipleSerializerMixin, ModelViewSe
             contributor.save()
 
         return Response(data=serializer.data)
+
+    def update(self, request, *args, **kwargs):
+        user = request.user.id
+        request.data._mutable = True
+        request.data['author_user'] = user
+        return super().update(request, *args, **kwargs)
 
     def get_queryset(self):
         return (
@@ -100,8 +106,16 @@ class IssueViewset(
             try:
                 if request.data["assignee_user"]:
                     assignee_user = User.objects.get(id=request.data["assignee_user"])
-                    get_object_or_404(Contributor, user=assignee_user, project=project)
-                    data["assignee_user"] = request.data["assignee_user"]
+                    if Contributor.objects.filter(
+                        user=assignee_user,
+                        project=project
+                    ).exists():
+                        data["assignee_user"] = request.data["assignee_user"]
+                    else:
+                        return Response(
+                            {'error': 'Assignee user not valid or not in contributors'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
             except KeyError:
                 data["assignee_user"] = user
             serializer = IssueListSerializer(data=data)
@@ -110,6 +124,13 @@ class IssueViewset(
                 serializer.save()
 
         return Response(data=serializer.data)
+
+    def update(self, request, *args, **kwargs):
+        user = request.user.id
+        request.data._mutable = True
+        request.data['author_user'] = user
+        request.data['project'] = kwargs['project_pk']
+        return super().update(request, *args, **kwargs)
 
     def get_queryset(self):
         self.get_project()
@@ -142,9 +163,16 @@ class CommentViewset(
 
         return Response(data=serializer.data)
 
+    def update(self, request, *args, **kwargs):
+        user = request.user.id
+        request.data._mutable = True
+        request.data['author_user'] = user
+        request.data['issue'] = kwargs['issue_pk']
+        return super().update(request, *args, **kwargs)
+
     def get_queryset(self):
         project = self.get_project()
-        get_object_or_404(pk=self.kwargs["issue_pk"], project=project)
+        get_object_or_404(Issue, pk=self.kwargs["issue_pk"], project=project)
         if self.check_contributor():
             return Comment.objects.filter(issue=self.kwargs["issue_pk"])
         raise PermissionDenied(
@@ -157,7 +185,7 @@ class ContributorViewset(
 ):
     serializer_class = ContributorSerializer
 
-    permission_classes = [IsAuthenticated, IsAuthor]
+    permission_classes = [IsAuthenticated, IsContributorAuthor]
 
     def create(self, request, *args, **kwargs):
         project = self.get_project()
@@ -169,6 +197,11 @@ class ContributorViewset(
             serializer.save()
 
         return Response(data=serializer.data)
+
+    def update(self, request, *args, **kwargs):
+        request.data._mutable = True
+        request.data['project'] = kwargs['project_pk']
+        return super().update(request, *args, **kwargs)
 
     def get_queryset(self):
         self.get_project()

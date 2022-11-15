@@ -67,6 +67,7 @@ class ProjectDetailSerializer(ModelSerializer):
         ]
 
 
+
 class IssueListSerializer(ModelSerializer):
     class Meta:
         model = Issue
